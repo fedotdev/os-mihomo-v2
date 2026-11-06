@@ -14,6 +14,7 @@ echo "===> Configuring os-mihomo"
 # Ensure config exists from @sample
 if [ ! -f /usr/local/etc/mihomo/config.yaml ]; then
     cp /usr/local/etc/mihomo/config.yaml.sample /usr/local/etc/mihomo/config.yaml
+    chmod 600 /usr/local/etc/mihomo/config.yaml
 fi
 if [ ! -f /usr/local/etc/mihomo/sub/env ]; then
     cp /usr/local/etc/mihomo/sub/env.sample /usr/local/etc/mihomo/sub/env
@@ -33,8 +34,7 @@ for secret_file in /usr/local/etc/mihomo/config.yaml /usr/local/etc/mihomo/sub/t
     [ -f "$secret_file" ] || continue
     sed -i '' "s/^secret:.*/secret: ${MIHOMO_SECRET}/" "$secret_file"
 done
-chmod 0644 /usr/local/etc/mihomo/config.yaml 2>/dev/null || true
-chmod 0600 /usr/local/etc/mihomo/sub/env /usr/local/etc/mihomo/sub/template_config.yaml 2>/dev/null || true
+chmod 0600 /usr/local/etc/mihomo/config.yaml /usr/local/etc/mihomo/sub/env /usr/local/etc/mihomo/sub/template_config.yaml 2>/dev/null || true
 rm -f /usr/local/www/sub.php /usr/local/www/status_sub_logs.php /usr/local/www/status_mihomo.php
 rm -f /usr/local/www/services_mihomo.php /usr/local/www/status_mihomo_logs.php
 rm -f /usr/local/www/services_mihomosub.php /usr/local/www/status_mihomosub_log.php

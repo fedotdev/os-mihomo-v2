@@ -202,6 +202,7 @@ function saveConfig($file, $content)
         }
         return [proxy_t('Failed to save configuration: temporary file write failed.'), "danger"];
     }
+    @chmod($temp_file, 0600);
 
     if (!@rename($temp_file, $file)) {
         @unlink($temp_file);
@@ -211,6 +212,7 @@ function saveConfig($file, $content)
         return [proxy_t('Failed to save configuration: cannot replace the active configuration file.'), "danger"];
     }
 
+    @chmod($file, 0600);
     return [proxy_t('Configuration saved successfully.'), "success"];
 }
 

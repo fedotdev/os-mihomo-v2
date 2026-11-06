@@ -70,6 +70,7 @@ cp "$1" "$STAGING_CONFIG" || die "failed to stage config" 4
 
 # Atomic swap
 mv "$STAGING_CONFIG" "$ACTIVE_CONFIG" || die "failed to activate config" 4
+chmod 600 "$ACTIVE_CONFIG" || die "failed to secure config permissions" 4
 
 # Restart (close lock FD before service to prevent inheritance)
 set +e

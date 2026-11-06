@@ -1,9 +1,10 @@
 # Phase 2.1 Complete: Sub.sh Production Path and Rollback Hardening
 
 **Date:** 2026-11-06  
-**Commits:** b9f5eee, 78c2d17  
+**Commits:** b9f5eee, 78c2d17, e0e65cd  
 **Tag:** `phase-2.1-hardened` (pending production test)  
-**Environment:** Code review only (production firewall TLS/SSH issues prevented deployment test)
+**Status:** Code review + minor fixes (API_URL sanitize, trap cleanup, exit codes); ready for production deployment.
+**Environment:** Code review verified (firewall TLS/SSH issues prevent remote test; manual USB/mirror deployment required)
 
 ## Summary
 

@@ -58,9 +58,27 @@ if mkdir "$LOCK_DIR" 2>/dev/null; then
     LOCK_HELD=1
     printf '%s\n' "$$" > "$LOCK_DIR/pid" 2>/dev/null || true
 else
-    echo "错误：订阅任务已在运行，请勿重复执行。"
-    [ -f "$LOCK_DIR/pid" ] && echo "当前锁持有进程 PID: $(cat "$LOCK_DIR/pid" 2>/dev/null)"
-    exit 9
+    # Check if lock holder is alive; remove stale lock on kill -9
+    if [ -f "$LOCK_DIR/pid" ]; then
+        LOCK_PID=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+        if [ -n "$LOCK_PID" ] && ! kill -0 "$LOCK_PID" 2>/dev/null; then
+            rm -rf "$LOCK_DIR" 2>/dev/null
+            if mkdir "$LOCK_DIR" 2>/dev/null; then
+                LOCK_HELD=1
+                printf '%s\n' "$$" > "$LOCK_DIR/pid" 2>/dev/null || true
+            else
+                echo "错误：无法清理或获取锁目录。"
+                exit 9
+            fi
+        else
+            echo "错误：订阅任务已在运行，请勿重复执行。"
+            echo "当前锁持有进程 PID: $LOCK_PID"
+            exit 9
+        fi
+    else
+        echo "错误：锁目录存在但无 PID 文件。"
+        exit 9
+    fi
 fi
 
 # mihomo订阅地址校验
