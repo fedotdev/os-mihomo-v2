@@ -46,6 +46,9 @@ sniffer:
     - Mijia Cloud
 tun:
   enable: true
+  # OPNsense-specific: firewall rules match this device name, and FreeBSD
+  # does not support "mixed" stack (it silently skips TUN creation).
+  # Both are rewritten on service start: stack → gvisor, device → tun_mihomo.
   stack: gvisor #使用gvisor，提供更好的兼容性和性能，system栈可能在某些环境下存在兼容性问题。
   device: tun_mihomo
   mtu: 1500
@@ -57,6 +60,8 @@ tun:
     - tcp://any:53
 dns:
   enable: true
+# OPNsense-specific: Unbound forwards to this port.
+# Any value in your config is rewritten to 1053 on service start.
   listen: 127.0.0.1:1053
   ipv6: false
   prefer-h3: false

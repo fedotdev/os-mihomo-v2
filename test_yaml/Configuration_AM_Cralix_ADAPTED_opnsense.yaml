@@ -1,0 +1,658 @@
+# Рабочая мобильная база + AM Cralix. Поиск процессов отключён.
+# Bootstrap: прямой DoH по IP. DNS сайтов, включая DIRECT: DoH через VPN.
+# Не блокирует самостоятельно обход DNS через роутер на уровне ОС.
+# OPNsense-адаптация: stack gvisor (mixed не создаёт tun на FreeBSD),
+# tun.device tun_mihomo (правила фаервола), dns.listen 1053 (Unbound forward).
+mixed-port: 7890
+allow-lan: false
+tcp-concurrent: true
+find-process-mode: 'off'
+mode: rule
+log-level: info
+ipv6: false
+keep-alive-interval: 30
+unified-delay: true
+profile:
+  store-selected: true
+  store-fake-ip: true
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: true
+  sniff:
+    HTTP:
+      ports:
+      - 80
+      - 8080-8880
+      override-destination: true
+    TLS:
+      ports:
+      - 443
+      - 8443
+  skip-domain:
+  - Mijia Cloud
+tun:
+  enable: true
+  stack: gvisor
+  device: tun_mihomo
+  auto-route: true
+  auto-detect-interface: true
+  dns-hijack:
+  - any:53
+  - tcp://any:53
+  strict-route: true
+  mtu: 1400
+dns:
+  enable: true
+  prefer-h3: false
+  use-hosts: true
+  use-system-hosts: true
+  listen: 127.0.0.1:1053
+  ipv6: false
+  enhanced-mode: redir-host
+  default-nameserver:
+  - https://1.1.1.1/dns-query
+  - https://9.9.9.9/dns-query
+  proxy-server-nameserver:
+  - https://1.1.1.1/dns-query
+  - https://9.9.9.9/dns-query
+  direct-nameserver:
+  - https://dns.quad9.net/dns-query#🌍 VPN
+  - https://cloudflare-dns.com/dns-query#🌍 VPN
+  direct-nameserver-follow-policy: true
+  nameserver:
+  - https://dns.quad9.net/dns-query#🌍 VPN
+  - https://cloudflare-dns.com/dns-query#🌍 VPN
+  nameserver-policy:
+    rule-set:ru-inline-banned:
+    - https://dns.quad9.net/dns-query#🌍 VPN
+    - https://cloudflare-dns.com/dns-query#🌍 VPN
+    rule-set:geosite-ru:
+    - https://dns.quad9.net/dns-query#🌍 VPN
+    - https://cloudflare-dns.com/dns-query#🌍 VPN
+    +.ru:
+    - https://dns.quad9.net/dns-query#🌍 VPN
+    - https://cloudflare-dns.com/dns-query#🌍 VPN
+    +.su:
+    - https://dns.quad9.net/dns-query#🌍 VPN
+    - https://cloudflare-dns.com/dns-query#🌍 VPN
+    +.xn--p1ai:
+    - https://dns.quad9.net/dns-query#🌍 VPN
+    - https://cloudflare-dns.com/dns-query#🌍 VPN
+proxies:
+- name: ICEbreaker🧊 (Sirius)
+  type: vless
+  server: ice.noooo.win
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: cab-6adb22c1.ferrin.uk
+  client-fingerprint: safari
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /
+    mode: stream-one
+    reuse-settings: &id002
+      max-connections: '1'
+      c-max-reuse-times: '0'
+- name: Torrents Free (Sirius)
+  type: vless
+  server: nl.alpheratzz.org
+  port: 8443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: tcp
+  flow: xtls-rprx-vision
+  tls: true
+  servername: api-v2-6adb22c1.vmagnum.win
+  client-fingerprint: safari
+  alpn:
+  - h2
+- name: Нидерланды🇳🇱 (Sirius)
+  type: vless
+  server: nl.alpheratzz.org
+  port: 8443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: tcp
+  flow: xtls-rprx-vision
+  tls: true
+  servername: api-v1-6adb22c1.vmagnum.win
+  client-fingerprint: firefox
+  alpn:
+  - h2
+- name: Lockpick〽 (Sirius)
+  type: vless
+  server: api.ferrin.uk
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: 6adb22c1-856ae76e.ferrin.uk
+  client-fingerprint: android
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /
+    mode: stream-one
+    reuse-settings: &id001
+      max-connections: '3'
+      h-max-reusable-secs: 1140-1260
+- name: Messengers (Sirius)
+  type: vless
+  server: api.ferrin.uk
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: 856ae76e.ferrin.uk
+  client-fingerprint: firefox
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /nl
+    mode: stream-one
+    reuse-settings: *id001
+- name: AI🤖 (Sirius)
+  type: vless
+  server: api.ferrin.uk
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: 856ae76e.ferrin.uk
+  client-fingerprint: firefox
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /ai
+    mode: stream-one
+    reuse-settings: *id001
+- name: TikTok🔷 (Sirius)
+  type: vless
+  server: api.ferrin.uk
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: 856ae76e.ferrin.uk
+  client-fingerprint: firefox
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /nl
+    mode: stream-one
+    reuse-settings: *id001
+- name: Польша🇵🇱 (Sirius)
+  type: vless
+  server: api.ferrin.uk
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: 856ae76e.ferrin.uk
+  client-fingerprint: firefox
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /ai
+    mode: stream-one
+    reuse-settings: *id001
+- name: Германия🇩🇪 (Sirius)
+  type: vless
+  server: de.vmagnum.win
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: api-v3-856ae76e.vmagnum.win
+  client-fingerprint: firefox
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /
+    mode: stream-one
+    reuse-settings: *id002
+- name: США+🇺🇸👍 (Sirius)
+  type: vless
+  server: us.alpheratzz.org
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: id-856ae76e.vmagnum.win
+  client-fingerprint: safari
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /
+    mode: stream-one
+    reuse-settings: *id002
+- name: Россия🇷🇺 (Sirius)
+  type: vless
+  server: rus.noooo.win
+  port: 8443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: tcp
+  flow: xtls-rprx-vision
+  tls: true
+  servername: id-6adb22c1.adhil.uk
+  client-fingerprint: edge
+  alpn:
+  - h2
+- name: Турция🇹🇷 (Sirius)
+  type: vless
+  server: api.ferrin.uk
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: 856ae76e.ferrin.uk
+  client-fingerprint: firefox
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /tr
+    mode: stream-one
+    reuse-settings: *id001
+- name: Финляндия🇫🇮 (Sirius)
+  type: vless
+  server: fi.alpheratzz.org
+  port: 443
+  uuid: 856ae76e-687e-4e96-8058-c206175df3eb
+  udp: true
+  packet-encoding: xudp
+  network: xhttp
+  tls: true
+  servername: 856ae76e.ferrin.uk
+  client-fingerprint: firefox
+  alpn:
+  - h2
+  xhttp-opts:
+    path: /
+    mode: stream-one
+    reuse-settings: *id002
+- name: AM Hysteria2 (Cralix)
+  type: hysteria2
+  server: am1.cralix.org
+  port: 41322
+  password: sv71vq61tr4tcxm9
+  up: 20 Mbps
+  down: 50 Mbps
+  obfs: salamander
+  obfs-password: scepcxsm2paqtl0h
+  sni: am1.cralix.org
+  alpn:
+  - h3
+  skip-cert-verify: false
+- name: AM VLESS (Cralix)
+  type: vless
+  server: am1.cralix.org
+  port: 11829
+  uuid: 1d87b5cb-ca73-465c-99b2-d2c5dc072cd8
+  udp: true
+  network: grpc
+  tls: true
+  servername: microsoft.com
+  client-fingerprint: chrome
+  encryption: mlkem768x25519plus.native.0rtt.Ydol9AEL17nwba2QPpolUdU5E9zst2OEptPXC7AREnU
+  reality-opts:
+    public-key: 5x3wGzumWyhm9UaClmj-D3R1in0prOQfoiecrsHS8F4
+    short-id: f897ef01f1cd
+    support-x25519mlkem768: true
+  grpc-opts:
+    grpc-service-name: //Tun
+- name: AMSTERDAM (Mono)
+  type: vless
+  server: vams.smartconnexio.com
+  port: 443
+  network: tcp
+  udp: true
+  uuid: 3828f84e-b4bc-4757-81a6-738b50e63b74
+  packet-encoding: xudp
+  flow: xtls-rprx-vision
+  tls: true
+  servername: www.yourownstorage.net
+  reality-opts:
+    public-key: 78u1iaGfYjqnDfgXYfLKXb-IqgTB6VOKS4xvyPZCQ20
+    short-id: 22ad14d9518dface
+  client-fingerprint: randomized
+- name: USA 🇺🇸 (Mono)
+  type: vless
+  server: melody4.smartconnexio.com
+  port: 443
+  network: tcp
+  udp: true
+  uuid: 3828f84e-b4bc-4757-81a6-738b50e63b74
+  packet-encoding: xudp
+  flow: xtls-rprx-vision
+  tls: true
+  servername: www.yourownstorage.net
+  reality-opts:
+    public-key: 78u1iaGfYjqnDfgXYfLKXb-IqgTB6VOKS4xvyPZCQ20
+    short-id: 22ad14d9518dface
+  client-fingerprint: chrome
+- name: AMSTERDAM RESERV (Mono)
+  type: vless
+  server: 5.35.97.243
+  port: 443
+  network: grpc
+  udp: true
+  uuid: 3828f84e-b4bc-4757-81a6-738b50e63b74
+  packet-encoding: xudp
+  tls: true
+  servername: www.yourownstorage.ru
+  reality-opts:
+    public-key: 78u1iaGfYjqnDfgXYfLKXb-IqgTB6VOKS4xvyPZCQ20
+    short-id: 22ad14d9518dface
+  grpc-opts:
+    grpc-service-name: /dashboard/auth
+  client-fingerprint: randomized
+proxy-groups:
+- name: 🌍 VPN
+  type: select
+  proxies:
+  - 🛟 Fallback
+  - 🏆 Auto
+  - 📡 Sirius
+  - 📡 Cralix
+  - 📡 Mono
+- name: 🛟 Fallback
+  type: fallback
+  url: https://cp.cloudflare.com/generate_204
+  expected-status: 204
+  timeout: 5000
+  interval: 120
+  lazy: false
+  max-failed-times: 2
+  proxies:
+  - Нидерланды🇳🇱 (Sirius)
+  - AM Hysteria2 (Cralix)
+  - AMSTERDAM (Mono)
+  - Германия🇩🇪 (Sirius)
+  - AMSTERDAM RESERV (Mono)
+  - USA 🇺🇸 (Mono)
+- name: 🏆 Auto
+  type: url-test
+  url: https://cp.cloudflare.com/generate_204
+  expected-status: 204
+  timeout: 5000
+  interval: 600
+  tolerance: 150
+  lazy: true
+  max-failed-times: 3
+  proxies:
+  - Нидерланды🇳🇱 (Sirius)
+  - Германия🇩🇪 (Sirius)
+  - США+🇺🇸👍 (Sirius)
+  - Финляндия🇫🇮 (Sirius)
+  - AM Hysteria2 (Cralix)
+  - AMSTERDAM (Mono)
+  - USA 🇺🇸 (Mono)
+- name: 📡 Sirius
+  type: select
+  proxies:
+  - Нидерланды🇳🇱 (Sirius)
+  - Германия🇩🇪 (Sirius)
+  - США+🇺🇸👍 (Sirius)
+  - Финляндия🇫🇮 (Sirius)
+  - Россия🇷🇺 (Sirius)
+  - Турция🇹🇷 (Sirius)
+  - Польша🇵🇱 (Sirius)
+  - Messengers (Sirius)
+  - AI🤖 (Sirius)
+  - TikTok🔷 (Sirius)
+  - Lockpick〽 (Sirius)
+  - ICEbreaker🧊 (Sirius)
+  - Torrents Free (Sirius)
+- name: 📡 Cralix
+  type: fallback
+  url: https://cp.cloudflare.com/generate_204
+  expected-status: 204
+  timeout: 5000
+  interval: 120
+  lazy: false
+  max-failed-times: 2
+  proxies:
+  - AM Hysteria2 (Cralix)
+  - AM VLESS (Cralix)
+- name: 📡 Mono
+  type: fallback
+  url: https://cp.cloudflare.com/generate_204
+  expected-status: 204
+  timeout: 5000
+  interval: 300
+  lazy: true
+  max-failed-times: 2
+  proxies:
+  - AMSTERDAM (Mono)
+  - AMSTERDAM RESERV (Mono)
+  - USA 🇺🇸 (Mono)
+- name: 📨 Telegram
+  type: select
+  proxies:
+  - 🌍 VPN
+  - 🛟 Fallback
+  - 🏆 Auto
+- name: 🚫 Blocked RU
+  type: select
+  proxies:
+  - 🌍 VPN
+  - 🛟 Fallback
+  - 🏆 Auto
+- name: 🧩 Zapret
+  type: select
+  proxies:
+  - 🌍 VPN
+  - DIRECT
+- name: 🧲 Torrents
+  type: select
+  proxies:
+  - DIRECT
+  - Torrents Free (Sirius)
+  - 🌍 VPN
+- name: 🇷🇺 RU Direct
+  type: select
+  proxies:
+  - DIRECT
+  - 🌍 VPN
+- name: 🧱 QUIC
+  type: select
+  proxies:
+  - 🌍 VPN
+  - REJECT
+- name: 🐟 Final
+  type: select
+  proxies:
+  - 🌍 VPN
+  - DIRECT
+rule-providers:
+  telegram-domain:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/telegram.mrs
+    path: ./rule-sets/telegram-domain.mrs
+    interval: 86400
+  telegram-ip:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/telegram.mrs
+    path: ./rule-sets/telegram-ip.mrs
+    interval: 86400
+  geosite-youtube:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/youtube.mrs
+    path: ./rule-sets/geosite-youtube.mrs
+    interval: 86400
+  geosite-discord:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/discord.mrs
+    path: ./rule-sets/geosite-discord.mrs
+    interval: 86400
+  ru-inline-banned:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/inline/ru-inline-banned.yaml
+    path: ./rule-sets/ru-inline-banned.yaml
+    interval: 86400
+  ru-inline:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/inline/ru-inline.yaml
+    path: ./rule-sets/ru-inline.yaml
+    interval: 86400
+  ru-app-list:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/ru-app-list.yaml
+    path: ./rule-sets/ru-app-list.yaml
+    interval: 86400
+  torrent-trackers:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-trackers.mrs
+    path: ./rule-sets/torrent-trackers.mrs
+    interval: 86400
+  torrent-clients:
+    type: http
+    behavior: classical
+    format: yaml
+    url: https://github.com/legiz-ru/mihomo-rule-sets/raw/main/other/torrent-clients.yaml
+    path: ./rule-sets/torrent-clients.yaml
+    interval: 86400
+  geosite-ru:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/category-ru.mrs
+    path: ./geosite-ru.mrs
+    interval: 86400
+  xiaomi:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/xiaomi.mrs
+    path: ./rule-sets/xiaomi.mrs
+    interval: 86400
+  blender:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/blender.mrs
+    path: ./rule-sets/blender.mrs
+    interval: 86400
+  drweb:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/drweb.mrs
+    path: ./rule-sets/drweb.mrs
+    interval: 86400
+  debian:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/debian.mrs
+    path: ./rule-sets/debian.mrs
+    interval: 86400
+  canonical:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/canonical.mrs
+    path: ./rule-sets/canonical.mrs
+    interval: 86400
+  python:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/python.mrs
+    path: ./rule-sets/python.mrs
+    interval: 86400
+  geoip-ru:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/ru.mrs
+    path: ./geoip-ru.mrs
+    interval: 86400
+  geosite-private:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geosite/private.mrs
+    path: ./geosite-private.mrs
+    interval: 86400
+  geoip-private:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://github.com/MetaCubeX/meta-rules-dat/raw/meta/geo/geoip/private.mrs
+    path: ./geoip-private.mrs
+    interval: 86400
+rules:
+- DOMAIN-SUFFIX,hoz-fili.ru,🌍 VPN
+- RULE-SET,telegram-domain,📨 Telegram
+- RULE-SET,telegram-ip,📨 Telegram,no-resolve
+- DOMAIN,mtalk.google.com,🌍 VPN
+- DOMAIN,android.clients.google.com,🌍 VPN
+- DST-PORT,5228-5230,🌍 VPN
+- DOMAIN-SUFFIX,googleapis.com,🌍 VPN
+- DOMAIN-SUFFIX,gstatic.com,🌍 VPN
+- AND,((NETWORK,UDP),(DST-PORT,19294-19344)),🧩 Zapret
+- AND,((NETWORK,UDP),(DST-PORT,50000-50100)),🧩 Zapret
+- RULE-SET,geosite-youtube,🧩 Zapret
+- RULE-SET,geosite-discord,🧩 Zapret
+- RULE-SET,ru-inline-banned,🚫 Blocked RU
+- DOMAIN-SUFFIX,gov.ru,DIRECT
+- DOMAIN-SUFFIX,selectel.ru,DIRECT
+- RULE-SET,geosite-private,DIRECT,no-resolve
+- RULE-SET,geoip-private,DIRECT,no-resolve
+- RULE-SET,torrent-clients,🧲 Torrents
+- RULE-SET,torrent-trackers,🧲 Torrents
+- RULE-SET,ru-app-list,🇷🇺 RU Direct
+- RULE-SET,ru-inline,🇷🇺 RU Direct
+- RULE-SET,geosite-ru,🇷🇺 RU Direct
+- RULE-SET,xiaomi,DIRECT
+- RULE-SET,blender,DIRECT
+- RULE-SET,drweb,DIRECT
+- RULE-SET,debian,DIRECT
+- RULE-SET,canonical,DIRECT
+- RULE-SET,python,DIRECT
+- RULE-SET,geoip-ru,🇷🇺 RU Direct
+- AND,((NETWORK,UDP),(DST-PORT,443)),🧱 QUIC
+- MATCH,🐟 Final
