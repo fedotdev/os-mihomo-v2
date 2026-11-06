@@ -21,3 +21,7 @@ deps: {
 desc: <<EOD
 @DESC@
 EOD
+files: {
+    @sample /usr/local/etc/mihomo/config.yaml.sample /usr/local/etc/mihomo/config.yaml
+    @sample(root,wheel,0600) /usr/local/etc/mihomo/sub/env.sample /usr/local/etc/mihomo/sub/env
+}

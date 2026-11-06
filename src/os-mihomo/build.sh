@@ -41,8 +41,8 @@ if ! command -v fetch >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
     die "fetch or curl command not found."
 fi
 
-need_file "src/usr/local/etc/mihomo/config.yaml"
-need_file "src/usr/local/etc/mihomo/sub/env"
+need_file "src/usr/local/etc/mihomo/config.yaml.sample"
+need_file "src/usr/local/etc/mihomo/sub/env.sample"
 need_file "src/usr/local/etc/mihomo/sub/sub.sh"
 need_file "src/usr/local/etc/mihomo/sub/template_config.yaml"
 need_file "src/usr/local/etc/rc.d/mihomo"

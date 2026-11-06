@@ -5,8 +5,12 @@ rm -f /var/lib/php/tmp/opnsense_menu_cache.xml /var/lib/php/tmp/opnsense_acl_cac
 rm -f /usr/local/opnsense/service/conf/actions.d/actions_mihomo.conf
 service configd restart >/dev/null 2>&1 || true
 
-echo "===> Scheduling mihomo residual directory cleanup"
-(
-    sleep 3
-    rm -rf /usr/local/etc/mihomo
-) >/dev/null 2>&1 &
+# Safety check: only clean runtime data if config was removed by user
+if [ ! -f /usr/local/etc/mihomo/config.yaml ]; then
+    echo "===> Cleaning mihomo runtime data (config removed by user)"
+    rm -rf /usr/local/etc/mihomo/subscription
+    rm -f /usr/local/etc/mihomo/cache.db
+    # Preserve config.yaml.sample (pkg handles it via @sample)
+else
+    echo "===> Preserving mihomo config (uninstall only, user data kept)"
+fi

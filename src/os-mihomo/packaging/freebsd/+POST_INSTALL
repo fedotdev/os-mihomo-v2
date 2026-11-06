@@ -11,6 +11,15 @@ pkg_timestamp() {
 
 echo "===> Configuring os-mihomo"
 
+# Ensure config exists from @sample
+if [ ! -f /usr/local/etc/mihomo/config.yaml ]; then
+    cp /usr/local/etc/mihomo/config.yaml.sample /usr/local/etc/mihomo/config.yaml
+fi
+if [ ! -f /usr/local/etc/mihomo/sub/env ]; then
+    cp /usr/local/etc/mihomo/sub/env.sample /usr/local/etc/mihomo/sub/env
+    chmod 0600 /usr/local/etc/mihomo/sub/env
+fi
+
 mkdir -p /etc/rc.conf.d
 echo 'mihomo_enable="YES"' > /etc/rc.conf.d/mihomo
 touch /var/log/mihomo.log /var/log/mihomo_sub.log 2>/dev/null || true
