@@ -41,7 +41,7 @@ set -e
 
 if [ $restart_status -ne 0 ]; then
     if [ -f "$LASTGOOD_CONFIG" ]; then
-        mv "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
+        cp "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
         service mihomo restart
     fi
     die "restart failed, rolled back" 2
@@ -53,7 +53,7 @@ for i in 1 2 3 4 5 6 7 8; do
     # Use exact match to avoid substring false positives
     if ! pgrep -qx mihomo; then
         if [ -f "$LASTGOOD_CONFIG" ]; then
-            mv "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
+            cp "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
             service mihomo restart
         fi
         die "process died, rolled back" 2
@@ -65,7 +65,7 @@ done
 
 # Timeout: TUN interface did not come up
 if [ -f "$LASTGOOD_CONFIG" ]; then
-    mv "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
+    cp "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
     service mihomo restart
 fi
 die "health check timeout, rolled back" 2
