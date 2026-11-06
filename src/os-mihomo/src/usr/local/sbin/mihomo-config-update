@@ -25,11 +25,6 @@ cp "$1" "$STAGING_CONFIG" || die "failed to stage config"
     die "validation failed" 1
 }
 
-# Backup current working config (skip on first run)
-if [ -f "$ACTIVE_CONFIG" ]; then
-    cp "$ACTIVE_CONFIG" "$LASTGOOD_CONFIG" || die "failed to backup config"
-fi
-
 # Atomic swap
 mv "$STAGING_CONFIG" "$ACTIVE_CONFIG" || die "failed to activate config" 1
 
@@ -59,7 +54,11 @@ for i in 1 2 3 4 5 6 7 8; do
         die "process died, rolled back" 2
     fi
     
-    ifconfig "$TUN_DEVICE" >/dev/null 2>&1 && exit 0
+    ifconfig "$TUN_DEVICE" >/dev/null 2>&1 && {
+        # Health check passed: commit the new config as last-good
+        cp "$ACTIVE_CONFIG" "$LASTGOOD_CONFIG"
+        exit 0
+    }
     sleep 1
 done
 
