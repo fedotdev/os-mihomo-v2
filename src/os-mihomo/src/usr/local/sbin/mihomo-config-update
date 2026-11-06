@@ -14,6 +14,20 @@ die() {
     exit "${2:-1}"
 }
 
+rollback() {
+    local reason="$1"
+    local exit_code="${2:-2}"
+    local source=""
+    [ -f "$LASTGOOD_CONFIG" ] && source="$LASTGOOD_CONFIG"
+    [ -z "$source" ] && [ -f "${CONFIG_DIR}/config.yaml.before-swap" ] && source="${CONFIG_DIR}/config.yaml.before-swap"
+    
+    if [ -n "$source" ]; then
+        cp "$source" "${ACTIVE_CONFIG}.tmp" && mv "${ACTIVE_CONFIG}.tmp" "$ACTIVE_CONFIG"
+        set +e; service mihomo restart; set -e
+    fi
+    die "$reason" "$exit_code"
+}
+
 [ $# -eq 1 ] || die "usage: mihomo-config-update <new-config.yaml>"
 [ -f "$1" ] || die "config file not found: $1"
 
@@ -33,6 +47,9 @@ cp "$1" "$STAGING_CONFIG" || die "failed to stage config"
     die "validation failed" 1
 }
 
+# Snapshot before swap (first-apply fallback)
+[ -f "$ACTIVE_CONFIG" ] && cp "$ACTIVE_CONFIG" "${CONFIG_DIR}/config.yaml.before-swap"
+
 # Atomic swap
 mv "$STAGING_CONFIG" "$ACTIVE_CONFIG" || die "failed to activate config" 1
 
@@ -43,39 +60,22 @@ restart_status=$?
 set -e
 
 if [ $restart_status -ne 0 ]; then
-    if [ -f "$LASTGOOD_CONFIG" ]; then
-        cp "$LASTGOOD_CONFIG" "${ACTIVE_CONFIG}.tmp" && mv "${ACTIVE_CONFIG}.tmp" "$ACTIVE_CONFIG"
-        set +e; service mihomo restart; set -e
-    fi
-    die "restart failed, rolled back" 2
+    rollback "restart failed, rolled back" 2
 fi
 
 # Health check: process alive + TUN up within 10s
 sleep 2
 for i in 1 2 3 4 5 6 7 8; do
-    if ! pgrep -qx mihomo; then
-        if [ -f "$LASTGOOD_CONFIG" ]; then
-            cp "$LASTGOOD_CONFIG" "${ACTIVE_CONFIG}.tmp" && mv "${ACTIVE_CONFIG}.tmp" "$ACTIVE_CONFIG"
-            set +e; service mihomo restart; set -e
-        fi
-        die "process died, rolled back" 2
-    fi
+    pgrep -qx mihomo || rollback "process died, rolled back" 2
     
     ifconfig "$TUN_DEVICE" >/dev/null 2>&1 && {
         # Health check passed: commit the new config as last-good (atomic)
         cp "$ACTIVE_CONFIG" "${LASTGOOD_CONFIG}.tmp" && mv "${LASTGOOD_CONFIG}.tmp" "$LASTGOOD_CONFIG"
-        rm -f "$PREUPDATE_CONFIG"
+        rm -f "$PREUPDATE_CONFIG" "${CONFIG_DIR}/config.yaml.before-swap"
         exit 0
     }
     sleep 1
 done
 
 # Timeout: TUN did not come up
-if [ -f "$LASTGOOD_CONFIG" ]; then
-    cp "$LASTGOOD_CONFIG" "${ACTIVE_CONFIG}.tmp" && mv "${ACTIVE_CONFIG}.tmp" "$ACTIVE_CONFIG"
-    set +e; service mihomo restart; set -e
-elif [ -f "$PREUPDATE_CONFIG" ]; then
-    cp "$PREUPDATE_CONFIG" "${ACTIVE_CONFIG}.tmp" && mv "${ACTIVE_CONFIG}.tmp" "$ACTIVE_CONFIG"
-    set +e; service mihomo restart; set -e
-fi
-die "health check timeout, rolled back" 2
+rollback "health check timeout, rolled back" 2
