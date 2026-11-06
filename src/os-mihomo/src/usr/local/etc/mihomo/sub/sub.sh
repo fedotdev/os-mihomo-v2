@@ -259,59 +259,43 @@ fi
 FINAL_SIZE=$(wc -c < "$TMP_FINAL" | tr -d ' ')
 echo "合成配置大小: ${FINAL_SIZE} 字节"
 
-cp "$TMP_FINAL" "$Conf_Dir/config.yaml" || {
-    echo "写入临时配置失败：$Conf_Dir/config.yaml"
-    exit 1
-}
-
-# 先清理旧的 secret，再在 external-ui 行之后插入 secret
-awk '!/^[[:space:]]*secret[[:space:]]*:/ { print }' "$Conf_Dir/config.yaml" > "$Conf_Dir/config.clean.yaml" && mv "$Conf_Dir/config.clean.yaml" "$Conf_Dir/config.yaml"
-
-if grep -q '^external-ui:' "$Conf_Dir/config.yaml"; then
+# shortcut: inject secret in-place before transaction; secret changes do not trigger validation
+TMP_CANDIDATE="$TMP_FINAL"
+awk '!/^[[:space:]]*secret[[:space:]]*:/ { print }' "$TMP_CANDIDATE" > "$TMP_CANDIDATE.clean" && mv "$TMP_CANDIDATE.clean" "$TMP_CANDIDATE"
+if grep -q '^external-ui:' "$TMP_CANDIDATE"; then
     awk -v secret="secret: ${Secret}" '
-      /^external-ui:/ {
-          print;
-          print secret;
-          next
-      }
+      /^external-ui:/ { print; print secret; next }
       { print }
-    ' "$Conf_Dir/config.yaml" > "$Conf_Dir/config.new.yaml" && mv "$Conf_Dir/config.new.yaml" "$Conf_Dir/config.yaml"
+    ' "$TMP_CANDIDATE" > "$TMP_CANDIDATE.new" && mv "$TMP_CANDIDATE.new" "$TMP_CANDIDATE"
 else
-    echo "secret: ${Secret}" >> "$Conf_Dir/config.yaml"
+    echo "secret: ${Secret}" >> "$TMP_CANDIDATE"
+fi
+
+if [ ! -s "$TMP_CANDIDATE" ]; then
+    echo "候选配置为空。"
+    exit 1
 fi
 echo "合成完成!"
 echo ""
 
 #################### 应用配置并重启 ####################
-if [ ! -s "$Conf_Dir/config.yaml" ]; then
-    echo "目标配置文件为空，停止应用。"
-    exit 1
-fi
-
 echo "应用配置（事务模式：staging → validate → swap → health-check）..."
 CONFIG_UPDATE_BIN="${MIHOMO_CONFIG_UPDATE:-/usr/local/sbin/mihomo-config-update}"
 if [ -x "$CONFIG_UPDATE_BIN" ]; then
-    "$CONFIG_UPDATE_BIN" "$Conf_Dir/config.yaml" && {
+    "$CONFIG_UPDATE_BIN" "$TMP_CANDIDATE" && {
         echo "配置已应用，服务运行正常。"
     } || {
-        echo "配置应用失败（退出码：$?）。当前配置未更改或已回滚。"
+        update_status=$?
+        case $update_status in
+            1) echo "配置验证失败（退出码1）。活动配置未更改。" ;;
+            2) echo "健康检查失败（退出码2）。已回滚到 .last-good。" ;;
+            *) echo "配置应用失败（退出码${update_status}）。" ;;
+        esac
         exit 1
     }
 else
-    echo "警告：事务工具未找到，使用传统更新流程（无自动回滚）。"
-    if "$MIHOMO_BIN" -d "$Clash_Dir" -t -f "$Conf_Dir/config.yaml" >/dev/null 2>&1; then
-        echo "配置校验通过"
-    else
-        echo "配置校验失败，未覆盖正式配置。"
-        exit 1
-    fi
-    cp "$Conf_Dir/config.yaml" "$FORMAL_CONFIG" || exit 1
-    chmod 600 "$FORMAL_CONFIG" 2>/dev/null || true
-    sh -c "$MIHOMO_SERVICE_CMD" || {
-        echo "重启失败，请手动检查。"
-        exit 1
-    }
-    echo "重启完成（未使用事务模式）。"
+    echo "错误：事务工具未找到。"
+    exit 1
 fi
 echo ""
 #################### 输出仪表盘信息 ####################
