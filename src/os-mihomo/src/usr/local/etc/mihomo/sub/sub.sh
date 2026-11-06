@@ -289,59 +289,31 @@ if [ ! -s "$Conf_Dir/config.yaml" ]; then
     exit 1
 fi
 
-echo "校验配置..."
-sleep 1
-if "$MIHOMO_BIN" -d "$Clash_Dir" -t -f "$Conf_Dir/config.yaml" >/dev/null 2>&1; then
-    echo "配置校验通过"
-else
-    echo "配置校验失败，未覆盖正式配置。"
-    exit 1
-fi
-
-echo "替换配置..."
-sleep 1
-if [ -f "$FORMAL_CONFIG" ]; then
-    BACKUP_CONFIG="${FORMAL_CONFIG}.bak.sub_$(date +%Y%m%d_%H%M%S)"
-    cp "$FORMAL_CONFIG" "$BACKUP_CONFIG" || {
-        echo "备份正式配置失败：$FORMAL_CONFIG"
+echo "应用配置（事务模式：staging → validate → swap → health-check）..."
+CONFIG_UPDATE_BIN="${MIHOMO_CONFIG_UPDATE:-/usr/local/sbin/mihomo-config-update}"
+if [ -x "$CONFIG_UPDATE_BIN" ]; then
+    "$CONFIG_UPDATE_BIN" "$Conf_Dir/config.yaml" && {
+        echo "配置已应用，服务运行正常。"
+    } || {
+        echo "配置应用失败（退出码：$?）。当前配置未更改或已回滚。"
         exit 1
     }
-    echo "正式配置已备份：$BACKUP_CONFIG"
-fi
-
-FORMAL_TMP=$(mktemp "$Temp_Dir/config.formal.XXXXXX") || {
-    echo "创建正式配置临时文件失败。"
-    exit 1
-}
-cp "$Conf_Dir/config.yaml" "$FORMAL_TMP" || {
-    echo "写入正式配置临时文件失败：$FORMAL_TMP"
-    exit 1
-}
-mv "$FORMAL_TMP" "$FORMAL_CONFIG" || {
-    echo "替换正式配置失败：$FORMAL_CONFIG"
-    exit 1
-}
-chmod 600 "$FORMAL_CONFIG" 2>/dev/null || true
-FORMAL_TMP=""
-echo "重启服务..."
-if ! sh -c "$MIHOMO_SERVICE_CMD" >/dev/null 2>&1; then
-    echo "重启失败，开始回滚正式配置。"
-    if [ -n "$BACKUP_CONFIG" ] && [ -s "$BACKUP_CONFIG" ]; then
-        cp "$BACKUP_CONFIG" "$FORMAL_CONFIG" || {
-            echo "回滚失败，请手动恢复：$BACKUP_CONFIG"
-            exit 1
-        }
-        if sh -c "$MIHOMO_SERVICE_CMD" >/dev/null 2>&1; then
-            echo "已回滚到旧配置并恢复 mihomo 服务。"
-        else
-            echo "已回滚旧配置，但 mihomo 服务仍启动失败，请手动检查。"
-        fi
+else
+    echo "警告：事务工具未找到，使用传统更新流程（无自动回滚）。"
+    if "$MIHOMO_BIN" -d "$Clash_Dir" -t -f "$Conf_Dir/config.yaml" >/dev/null 2>&1; then
+        echo "配置校验通过"
     else
-        echo "未找到可用备份，无法自动回滚。"
+        echo "配置校验失败，未覆盖正式配置。"
+        exit 1
     fi
-    exit 1
+    cp "$Conf_Dir/config.yaml" "$FORMAL_CONFIG" || exit 1
+    chmod 600 "$FORMAL_CONFIG" 2>/dev/null || true
+    sh -c "$MIHOMO_SERVICE_CMD" || {
+        echo "重启失败，请手动检查。"
+        exit 1
+    }
+    echo "重启完成（未使用事务模式）。"
 fi
-echo "重启完成！"
 echo ""
 #################### 输出仪表盘信息 ####################
 sleep 1

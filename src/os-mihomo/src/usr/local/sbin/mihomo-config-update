@@ -1,0 +1,71 @@
+#!/bin/sh
+# Atomic config update with validation and rollback
+
+MIHOMO_BIN="/usr/local/bin/mihomo"
+CONFIG_DIR="/usr/local/etc/mihomo"
+ACTIVE_CONFIG="${CONFIG_DIR}/config.yaml"
+STAGING_CONFIG="${CONFIG_DIR}/config.yaml.staging"
+LASTGOOD_CONFIG="${CONFIG_DIR}/config.yaml.last-good"
+TUN_DEVICE="tun_mihomo"
+
+die() {
+    echo "error: $*" >&2
+    exit "${2:-1}"
+}
+
+[ $# -eq 1 ] || die "usage: mihomo-config-update <new-config.yaml>"
+[ -f "$1" ] || die "config file not found: $1"
+
+# Stage new config
+cp "$1" "$STAGING_CONFIG" || die "failed to stage config"
+
+# Validate (mihomo needs -d for geodata/providers path)
+"$MIHOMO_BIN" -d "$CONFIG_DIR" -t -f "$STAGING_CONFIG" >/dev/null 2>&1 || {
+    rm -f "$STAGING_CONFIG"
+    die "validation failed" 1
+}
+
+# Backup current working config (skip on first run)
+if [ -f "$ACTIVE_CONFIG" ]; then
+    cp "$ACTIVE_CONFIG" "$LASTGOOD_CONFIG" || die "failed to backup config"
+fi
+
+# Atomic swap
+mv "$STAGING_CONFIG" "$ACTIVE_CONFIG" || die "failed to activate config" 1
+
+# Restart (disable set -e for rollback path)
+set +e
+service mihomo restart
+restart_status=$?
+set -e
+
+if [ $restart_status -ne 0 ]; then
+    if [ -f "$LASTGOOD_CONFIG" ]; then
+        mv "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
+        service mihomo restart
+    fi
+    die "restart failed, rolled back" 2
+fi
+
+# Health check: process alive + TUN up within 10s
+sleep 2
+for i in 1 2 3 4 5 6 7 8; do
+    # Use exact match to avoid substring false positives
+    if ! pgrep -qx mihomo; then
+        if [ -f "$LASTGOOD_CONFIG" ]; then
+            mv "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
+            service mihomo restart
+        fi
+        die "process died, rolled back" 2
+    fi
+    
+    ifconfig "$TUN_DEVICE" >/dev/null 2>&1 && exit 0
+    sleep 1
+done
+
+# Timeout: TUN interface did not come up
+if [ -f "$LASTGOOD_CONFIG" ]; then
+    mv "$LASTGOOD_CONFIG" "$ACTIVE_CONFIG"
+    service mihomo restart
+fi
+die "health check timeout, rolled back" 2
