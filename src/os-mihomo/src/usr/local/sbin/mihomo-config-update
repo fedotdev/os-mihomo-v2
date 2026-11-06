@@ -7,39 +7,57 @@ ACTIVE_CONFIG="${CONFIG_DIR}/config.yaml"
 STAGING_CONFIG="${CONFIG_DIR}/config.yaml.staging"
 LASTGOOD_CONFIG="${CONFIG_DIR}/config.yaml.last-good"
 PREUPDATE_CONFIG="${CONFIG_DIR}/config.yaml.pre-update"
+BEFORE_SWAP="${CONFIG_DIR}/config.yaml.before-swap"
 TUN_DEVICE="tun_mihomo"
+LOCK_FILE="/var/run/mihomo-config.lock"
 
 die() {
     echo "error: $*" >&2
     exit "${2:-1}"
 }
 
+health_check() {
+    pgrep -qx mihomo || return 1
+    ifconfig "$TUN_DEVICE" >/dev/null 2>&1 || return 1
+    return 0
+}
+
 rollback() {
     local reason="$1"
     local exit_code="${2:-2}"
-    local source=""
-    [ -f "$LASTGOOD_CONFIG" ] && source="$LASTGOOD_CONFIG"
-    [ -z "$source" ] && [ -f "${CONFIG_DIR}/config.yaml.before-swap" ] && source="${CONFIG_DIR}/config.yaml.before-swap"
     
-    if [ -n "$source" ]; then
-        cp "$source" "${ACTIVE_CONFIG}.tmp" && mv "${ACTIVE_CONFIG}.tmp" "$ACTIVE_CONFIG"
-        set +e; service mihomo restart; set -e
-    fi
-    die "$reason" "$exit_code"
+    # Priority: .before-swap (what was working), then .last-good
+    for source in "$BEFORE_SWAP" "$LASTGOOD_CONFIG"; do
+        [ -f "$source" ] || continue
+        cp "$source" "${ACTIVE_CONFIG}.tmp" && mv "${ACTIVE_CONFIG}.tmp" "$ACTIVE_CONFIG" || continue
+        set +e; service mihomo restart 9>&-; set -e
+        sleep 2
+        if health_check; then
+            echo "rolled back to $(basename "$source")" >&2
+            die "$reason" 2
+        fi
+    done
+    
+    # Both rollback sources failed
+    die "rollback failed: $reason, service unusable" 3
 }
 
 [ $# -eq 1 ] || die "usage: mihomo-config-update <new-config.yaml>"
 [ -f "$1" ] || die "config file not found: $1"
 
-# shortcut: preserve active config if it differs from .last-good (e.g., manual WebGUI edit)
+# Acquire lock (non-blocking)
+exec 9>"$LOCK_FILE"
+lockf -s -t 0 9 || die "update already in progress" 75
+
+# Preserve active config if it differs from .last-good (e.g., manual WebGUI edit)
 if [ -f "$ACTIVE_CONFIG" ] && [ -f "$LASTGOOD_CONFIG" ]; then
     cmp -s "$ACTIVE_CONFIG" "$LASTGOOD_CONFIG" || {
-        cp "$ACTIVE_CONFIG" "$PREUPDATE_CONFIG" || die "failed to preserve pre-update config"
+        cp "$ACTIVE_CONFIG" "$PREUPDATE_CONFIG" || die "failed to preserve pre-update config" 4
     }
 fi
 
 # Stage new config
-cp "$1" "$STAGING_CONFIG" || die "failed to stage config"
+cp "$1" "$STAGING_CONFIG" || die "failed to stage config" 4
 
 # Validate (mihomo needs -d for geodata/providers path)
 "$MIHOMO_BIN" -d "$CONFIG_DIR" -t -f "$STAGING_CONFIG" >/dev/null 2>&1 || {
@@ -47,35 +65,36 @@ cp "$1" "$STAGING_CONFIG" || die "failed to stage config"
     die "validation failed" 1
 }
 
-# Snapshot before swap (first-apply fallback)
-[ -f "$ACTIVE_CONFIG" ] && cp "$ACTIVE_CONFIG" "${CONFIG_DIR}/config.yaml.before-swap"
+# Snapshot before swap (working config before transaction)
+[ -f "$ACTIVE_CONFIG" ] && cp "$ACTIVE_CONFIG" "$BEFORE_SWAP"
 
 # Atomic swap
-mv "$STAGING_CONFIG" "$ACTIVE_CONFIG" || die "failed to activate config" 1
+mv "$STAGING_CONFIG" "$ACTIVE_CONFIG" || die "failed to activate config" 4
 
-# Restart (disable set -e for rollback path)
+# Restart (close lock FD before service to prevent inheritance)
 set +e
-service mihomo restart
+service mihomo restart 9>&-
 restart_status=$?
 set -e
 
-if [ $restart_status -ne 0 ]; then
-    rollback "restart failed, rolled back" 2
-fi
+[ $restart_status -ne 0 ] && rollback "restart failed" 2
 
 # Health check: process alive + TUN up within 10s
 sleep 2
 for i in 1 2 3 4 5 6 7 8; do
-    pgrep -qx mihomo || rollback "process died, rolled back" 2
-    
-    ifconfig "$TUN_DEVICE" >/dev/null 2>&1 && {
-        # Health check passed: commit the new config as last-good (atomic)
-        cp "$ACTIVE_CONFIG" "${LASTGOOD_CONFIG}.tmp" && mv "${LASTGOOD_CONFIG}.tmp" "$LASTGOOD_CONFIG"
-        rm -f "$PREUPDATE_CONFIG" "${CONFIG_DIR}/config.yaml.before-swap"
+    health_check && {
+        # Commit new config as last-good (atomic)
+        cp "$ACTIVE_CONFIG" "${LASTGOOD_CONFIG}.tmp" && mv "${LASTGOOD_CONFIG}.tmp" "$LASTGOOD_CONFIG" || die "failed to commit last-good" 4
+        
+        # Archive .pre-update if it differs from new .last-good (preserve manual edit history)
+        if [ -f "$PREUPDATE_CONFIG" ]; then
+            cmp -s "$PREUPDATE_CONFIG" "$LASTGOOD_CONFIG" || \
+                mv "$PREUPDATE_CONFIG" "${PREUPDATE_CONFIG}.$(date +%Y%m%d_%H%M%S)"
+        fi
+        rm -f "$BEFORE_SWAP"
         exit 0
     }
     sleep 1
 done
 
-# Timeout: TUN did not come up
-rollback "health check timeout, rolled back" 2
+rollback "health check timeout" 2

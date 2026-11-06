@@ -46,7 +46,7 @@ cleanup_tmp_files() {
     [ -n "$TMP_RAW" ] && rm -f "$TMP_RAW"
     [ -n "$TMP_PROXIES" ] && rm -f "$TMP_PROXIES"
     [ -n "$TMP_NAMES" ] && rm -f "$TMP_NAMES"
-    [ -n "$TMP_FINAL" ] && rm -f "$TMP_FINAL"
+    [ -n "$TMP_FINAL" ] && rm -f "$TMP_FINAL" "$TMP_FINAL.clean" "$TMP_FINAL.new"
     rm -f "$Conf_Dir/config.clean.yaml" "$Conf_Dir/config.new.yaml"
     [ "$LOCK_HELD" = "1" ] && rm -f "$LOCK_DIR/pid" 2>/dev/null || true
     [ "$LOCK_HELD" = "1" ] && rmdir "$LOCK_DIR" 2>/dev/null || true
@@ -103,6 +103,8 @@ TMP_FINAL=$(mktemp "$Temp_Dir/config.XXXXXX") || {
 #################### 下载配置 ####################
 ENCODED_URL=$(printf "%s" "$mihomo_URL" | jq -s -R -r @uri)
 API_URL="${API_BASE}?target=clash&url=${ENCODED_URL}&udp=true&clash.dns=true&list=false"
+# Sanitize for logs: strip subscription token from URL
+SAFE_URL=$(printf "%s" "$API_URL" | sed 's/\(url=[^&]*\)/url=<redacted>/')
 echo ""
 echo "尝试不使用代理从订阅服务下载配置..."
 if curl -fL $CURL_TLS_ARGS -sS --retry 3 -m 15 -o "$TMP_RAW" -- "$API_URL"; then
@@ -112,7 +114,7 @@ else
     if curl -fL $CURL_TLS_ARGS -sS --retry 2 -m 15 --socks5-hostname 127.0.0.1:7891 -o "$TMP_RAW" "$API_URL"; then
         echo "下载成功：$TMP_RAW"
     else
-        echo "下载失败：$API_URL"
+        echo "下载失败：${SAFE_URL}"
         echo "请检查网络连接或 mihomo 是否运行并监听 127.0.0.1:7891"
         exit 2
     fi
@@ -288,7 +290,10 @@ if [ -x "$CONFIG_UPDATE_BIN" ]; then
         update_status=$?
         case $update_status in
             1) echo "配置验证失败（退出码1）。活动配置未更改。" ;;
-            2) echo "健康检查失败（退出码2）。已回滚到 .last-good。" ;;
+            2) echo "健康检查失败（退出码2）。已回滚到上一份可用配置（.before-swap/.last-good），服务已恢复。" ;;
+            3) echo "严重：健康检查失败且回滚失败（退出码3）。.before-swap 与 .last-good 均无法使服务正常，请人工介入。" ;;
+            4) echo "I/O 错误（退出码4）。配置文件读写失败，活动配置未更改。" ;;
+            75) echo "配置更新正在进行（退出码75）。稍后重试。" ;;
             *) echo "配置应用失败（退出码${update_status}）。" ;;
         esac
         exit 1
