@@ -187,10 +187,10 @@ function saveConfig($file, $content)
 
     $backup_file = $file . ".bak." . date("Ymd_His");
     $backup_created = false;
-    if (file_exists($file)) {
-        if (!@copy($file, $backup_file)) {
-            return [proxy_t('Configuration backup failed; save canceled.'), "danger"];
-        }
+    if (file_exists($file) && !@copy($file, $backup_file)) {
+        return [proxy_t('Configuration backup failed; save canceled.'), "danger"];
+    }
+    if (file_exists($backup_file)) {
         $backup_created = true;
     }
 

@@ -104,8 +104,8 @@ TMP_FINAL=$(mktemp "$Temp_Dir/config.XXXXXX") || {
 ENCODED_URL=$(printf "%s" "$mihomo_URL" | jq -s -R -r @uri)
 API_URL="${API_BASE}?target=clash&url=${ENCODED_URL}&udp=true&clash.dns=true&list=false"
 echo ""
-echo "尝试不使用代理从：$API_URL 下载配置..."
-if curl -fL $CURL_TLS_ARGS -sS --retry 3 -m 15 -o "$TMP_RAW" "$API_URL"; then
+echo "尝试不使用代理从订阅服务下载配置..."
+if curl -fL $CURL_TLS_ARGS -sS --retry 3 -m 15 -o "$TMP_RAW" -- "$API_URL"; then
     echo "下载成功：$TMP_RAW"
 else
     echo "下载失败，尝试通过 SOCKS5 代理 127.0.0.1:7891 下载配置..."
