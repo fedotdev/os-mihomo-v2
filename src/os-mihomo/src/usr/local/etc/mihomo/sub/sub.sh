@@ -47,7 +47,6 @@ cleanup_tmp_files() {
     [ -n "$TMP_PROXIES" ] && rm -f "$TMP_PROXIES"
     [ -n "$TMP_NAMES" ] && rm -f "$TMP_NAMES"
     [ -n "$TMP_FINAL" ] && rm -f "$TMP_FINAL"
-    [ -n "$FORMAL_TMP" ] && rm -f "$FORMAL_TMP"
     rm -f "$Conf_Dir/config.clean.yaml" "$Conf_Dir/config.new.yaml"
     [ "$LOCK_HELD" = "1" ] && rm -f "$LOCK_DIR/pid" 2>/dev/null || true
     [ "$LOCK_HELD" = "1" ] && rmdir "$LOCK_DIR" 2>/dev/null || true
