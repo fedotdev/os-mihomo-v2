@@ -25,6 +25,71 @@ command_args="-P ${pidfile} -f -o ${logfile} -t ${name}:daemon /usr/local/bin/mi
 
 : ${mihomo_enable:="NO"}
 
+config_file="/usr/local/etc/mihomo/config.yaml"
+
+# Rewrite the three keys OPNsense owns so a config written for another host
+# still works here: Unbound forwards to dns.listen, the firewall rules match
+# tun.device, and FreeBSD has no "mixed" tun stack (it silently skips TUN).
+_normalize_config()
+{
+    [ -f "${config_file}" ] || return 0
+
+    _normalized="$(awk '
+        function close_section() {
+            if (in_section == "dns" && !dns_listen_done) print "  listen: 127.0.0.1:1053"
+            if (in_section == "tun") {
+                if (!tun_stack_done) print "  stack: gvisor"
+                if (!tun_device_done) print "  device: tun_mihomo"
+            }
+            in_section = ""
+        }
+        BEGIN { in_section = ""; dns_listen_done = 0; tun_stack_done = 0; tun_device_done = 0 }
+        /^dns:[[:space:]]*$/ { close_section(); in_section = "dns"; dns_listen_done = 0; print; next }
+        /^tun:[[:space:]]*$/ { close_section(); in_section = "tun"; tun_stack_done = 0; tun_device_done = 0; print; next }
+        /^[^[:space:]#]/ { close_section(); print; next }
+        in_section == "dns" && /^[[:space:]]+listen:[[:space:]]*/ {
+            if (!dns_listen_done) { print "  listen: 127.0.0.1:1053"; dns_listen_done = 1 }
+            next
+        }
+        in_section == "tun" && /^[[:space:]]+stack:[[:space:]]*/ {
+            if (!tun_stack_done) { print "  stack: gvisor"; tun_stack_done = 1 }
+            next
+        }
+        in_section == "tun" && /^[[:space:]]+device:[[:space:]]*/ {
+            if (!tun_device_done) { print "  device: tun_mihomo"; tun_device_done = 1 }
+            next
+        }
+        { print }
+        END { close_section() }
+    ' "${config_file}")" || return 1
+
+    # Missing top-level sections: append them so the run is still valid.
+    if ! grep -q '^dns:' "${config_file}"; then
+        _normalized="${_normalized}${_normalized:+
+}dns:
+  listen: 127.0.0.1:1053"
+    fi
+    if ! grep -q '^tun:' "${config_file}"; then
+        _normalized="${_normalized}${_normalized:+
+}tun:
+  stack: gvisor
+  device: tun_mihomo"
+    fi
+
+    if [ "${_normalized}" = "$(cat "${config_file}")" ]; then
+        return 0
+    fi
+
+    # Keep the pre-normalization original so a user can diff what OPNsense changed.
+    cp -p "${config_file}" "${config_file}.normalized" || return 1
+
+    _tmp="$(mktemp "${config_file}.XXXXXX")" || return 1
+    printf '%s\n' "${_normalized}" > "${_tmp}" || { rm -f "${_tmp}"; return 1; }
+    chmod 600 "${_tmp}"
+    mv -f "${_tmp}" "${config_file}" || { rm -f "${_tmp}"; return 1; }
+    echo "mihomo: normalized tun.stack=gvisor, tun.device=tun_mihomo, dns.listen=127.0.0.1:1053."
+}
+
 mihomo_prestart()
 {
     touch "${logfile}"
@@ -33,6 +98,8 @@ mihomo_prestart()
         echo "Refusing to start mihomo: sing-box is already running and owns transparent routing."
         return 1
     fi
+
+    _normalize_config
 
     if ! /usr/local/bin/mihomo -t -d /usr/local/etc/mihomo -f /usr/local/etc/mihomo/config.yaml >> "${logfile}" 2>&1; then
         echo "Mihomo configuration validation failed."
